@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizador de Revista</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="viewer-container">
+        <canvas id="pdf-render"></canvas>
+        <div class="controls">
+            <button id="prev-page">Anterior</button>
+            <span id="page-info">Página <span id="page-num"></span> de <span id="page-count"></span></span>
+            <button id="next-page">Siguiente</button>
+        </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
+
+<style>
+  body {
+    font-family: 'Poppins', sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #f9f9f9;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+.viewer-container {
+    position: relative;
+    width: 80%;
+    height: 90%;
+    background: white;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+}
+
+canvas {
+    max-width: 100%;
+    max-height: 100%;
+    border: 1px solid #ddd;
+}
+
+.controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 10px;
+    gap: 10px;
+}
+
+button {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.3s ease;
+    font-size: 16px;
+}
+
+button:hover {
+    background: #0056b3;
+}
+
+#page-info {
+    font-size: 16px;
+    font-weight: bold;
+}
+  
+</style>
+
+<script>
+  const pdfUrl = 'https://raw.githubusercontent.com/Fran15711/memoriasdelandrade/main/Revista%20completa%20Andrade.pdf';
+
+// Variables
+let pdfDoc = null,
+    currentPage = 1,
+    isRendering = false,
+    pendingPage = null,
+    scale = 1.5,
+    canvas = document.getElementById('pdf-render'),
+    ctx = canvas.getContext('2d');
+
+// Inicializar PDF.js
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+// Cargar PDF
+pdfjsLib.getDocument(pdfUrl).promise.then(doc => {
+    pdfDoc = doc;
+    document.getElementById('page-count').textContent = pdfDoc.numPages;
+    renderPage(currentPage);
+}).catch(err => {
+    console.error('Error cargando el PDF:', err.message);
+});
+
+// Renderizar una página
+function renderPage(num) {
+    isRendering = true;
+
+    // Obtener página
+    pdfDoc.getPage(num).then(page => {
+        const viewport = page.getViewport({ scale });
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+
+        const renderContext = {
+            canvasContext: ctx,
+            viewport
+        };
+
+        // Renderizar en canvas
+        page.render(renderContext).promise.then(() => {
+            isRendering = false;
+            if (pendingPage !== null) {
+                renderPage(pendingPage);
+                pendingPage = null;
+            }
+        });
+
+        // Actualizar número de página
+        document.getElementById('page-num').textContent = num;
+    });
+}
+
+// Cambiar de página
+function queueRenderPage(num) {
+    if (isRendering) {
+        pendingPage = num;
+    } else {
+        renderPage(num);
+    }
+}
+
+// Botón anterior
+document.getElementById('prev-page').addEventListener('click', () => {
+    if (currentPage <= 1) return;
+    currentPage--;
+    queueRenderPage(currentPage);
+});
+
+// Botón siguiente
+document.getElementById('next-page').addEventListener('click', () => {
+    if (currentPage >= pdfDoc.numPages) return;
+    currentPage++;
+    queueRenderPage(currentPage);
+});
+</script>
